@@ -1,14 +1,15 @@
+Python
 import streamlit as st
 import pandas as pd
 
-# 頁面配置
+# 1. 透過 html 加入 translate="no"，阻止瀏覽器自動翻譯破壞 DOM 結構
 st.set_page_config(page_title="成本估價系統", layout="wide")
+st.markdown('<div translate="no">', unsafe_allow_html=True)
 
 st.title("🧮 自動化成本估價系統")
 
 # 初始化或載入預設資料庫
 if 'database' not in st.session_state:
-    # 預設資料庫範例 (可於網頁側邊欄自由新增維護)
     initial_db = [
         {"物品編號": "JJB1-303015-1.0ST", "品名": "白鐵明箱300*300*150 厚1.0 ST底", "類別": "白鐵箱", "單位": "只", "單價": 1300, "主要供應商": "三雨水電"},
         {"物品編號": "BHA32C05", "品名": "士林回路保護器2P5A 380V/6KA", "類別": "2P-5A", "單位": "只", "單價": 249, "主要供應商": "三雨水電"},
@@ -84,7 +85,6 @@ st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
     cart_df = pd.DataFrame(st.session_state.cart)
     
-    # 允許使用者在線上表格直接修正數量或備註
     edited_cart = st.data_editor(
         cart_df,
         column_config={
@@ -95,21 +95,18 @@ if len(st.session_state.cart) > 0:
         num_rows="dynamic"
     )
     
-    # 動態重新計算小計
     edited_cart["小計金額 (NT$)"] = edited_cart["數量"] * edited_cart["標準單價 (NT$)"]
     total_amount = edited_cart["小計金額 (NT$)"].sum()
     item_count = len(edited_cart)
 
-    # 顯示統計卡片
     col_a, col_b = st.columns(2)
     col_a.metric("填報品項筆數", f"{item_count} 筆")
     col_b.metric("報價總金額 (NT$)", f"${total_amount:,.0f}")
 
-    # 清除與下載功能
     col_dl1, col_dl2 = st.columns(2)
     if col_dl1.button("🗑️ 清空報價單"):
         st.session_state.cart = []
-        st.experimental_rerun()
+        st.rerun()
         
     csv_data = edited_cart.to_csv(index=False).encode('utf-8-sig')
     col_dl2.download_button(
