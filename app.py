@@ -51,7 +51,6 @@ if not os.path.exists(DB_FILE):
     ]
     pd.DataFrame(initial_db).to_csv(DB_FILE, index=False, encoding="utf-8-sig")
 
-# 每次重新整理或載入時，直接從實體 CSV 檔讀取最新資料
 df_database = pd.read_csv(DB_FILE)
 
 # 側邊欄：主資料庫管理
@@ -61,7 +60,6 @@ db_option = st.sidebar.radio("選擇操作", ["查看/編輯資料庫", "新增�
 if db_option == "查看/編輯資料庫":
     st.sidebar.subheader("當前品項資料庫")
     edited_db = st.sidebar.data_editor(df_database, num_rows="dynamic")
-    # 如果使用者直接在表格上修改或刪除，同步存回 CSV
     if not edited_db.equals(df_database):
         edited_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
         st.sidebar.success("資料庫修改已同步儲存！")
@@ -74,17 +72,18 @@ elif db_option == "新增品項":
         name = st.text_input("品名")
         category = st.text_input("品牌/類別")
         unit = st.text_input("單位", value="只")
-        price = st.number_input("標準單價 (NT$)", min_value=0, value=0)
+        # 設定 value=None 讓預設欄位顯示為空白 placeholder
+        price = st.number_input("標準單價 (NT$)", min_value=0, value=None, placeholder="請輸入單價")
         supplier = st.text_input("主要供應商")
         submit = st.form_submit_button("新增品項")
         
         if submit and name:
+            actual_price = price if price is not None else 0
             new_row = pd.DataFrame([{
                 "物品編號": code, "品名": name, "類別": category,
-                "單位": unit, "單價": price, "主要供應商": supplier
+                "單位": unit, "單價": actual_price, "主要供應商": supplier
             }])
             updated_db = pd.concat([df_database, new_row], ignore_index=True)
-            # 將新增的品項存入 CSV 檔
             updated_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
             st.sidebar.success(f"已成功新增並永久儲存：{name}")
             st.rerun()
@@ -151,7 +150,7 @@ if len(st.session_state.cart) > 0:
         
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    export_filename = f"{today_str}-{name_suffix}_成本.csv"
+    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
 
     export_df = edited_cart.copy()
     total_row = pd.DataFrame([{
