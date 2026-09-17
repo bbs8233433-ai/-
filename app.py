@@ -151,7 +151,7 @@ if len(st.session_state.cart) > 0:
         
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
+    export_filename = f"{today_str}-{name_suffix}_成本.csv"
 
     export_df = edited_cart.copy()
     total_row = pd.DataFrame([{
