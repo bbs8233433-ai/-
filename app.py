@@ -101,7 +101,7 @@ if st.button("➕ 將勾選項目加入報價單"):
                 "物品編號": db_match["物品編號"],
                 "品牌/類別": db_match["類別"],
                 "單位": db_match["單位"],
-                "數量": 1,  # 預設數量為 1
+                "數量": 1,
                 "標準單價 (NT$)": db_match["單價"],
                 "小計金額 (NT$)": db_match["單價"],
                 "備註說明": ""
@@ -142,9 +142,23 @@ if len(st.session_state.cart) > 0:
     # 自動取得今天日期 YYYYMMDD 格式
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    export_filename = f"{today_str}-{name_suffix}_成本.csv"
+    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
 
-    csv_data = edited_cart.to_csv(index=False).encode('utf-8-sig')
+    # 在導出的 CSV 資料最下方加入「總計金額」行
+    export_df = edited_cart.copy()
+    total_row = pd.DataFrame([{
+        "品名": "總計",
+        "物品編號": "",
+        "品牌/類別": "",
+        "單位": "",
+        "數量": "",
+        "標準單價 (NT$)": "",
+        "小計金額 (NT$)": total_amount,
+        "備註說明": ""
+    }])
+    export_df = pd.concat([export_df, total_row], ignore_index=True)
+
+    csv_data = export_df.to_csv(index=False).encode('utf-8-sig')
     col_dl2.download_button(
         label="📥 下載報價單 (CSV)",
         data=csv_data,
