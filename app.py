@@ -142,7 +142,7 @@ if len(st.session_state.cart) > 0:
     # 自動取得今天日期 YYYYMMDD 格式
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
+    export_filename = f"{today_str}-{name_suffix}_成本.csv"
 
     csv_data = edited_cart.to_csv(index=False).encode('utf-8-sig')
     col_dl2.download_button(
