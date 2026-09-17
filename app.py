@@ -7,7 +7,7 @@ st.markdown('<div translate="no">', unsafe_allow_html=True)
 
 st.title("🧮 自動化成本估價系統")
 
-# 初始化完整材料資料庫 (已帶入圖片中所有品項)
+# 初始化完整材料資料庫
 if 'database' not in st.session_state:
     initial_db = [
         {"物品編號": "BHA32C20", "品名": "士林回路保護器2P20A 380V/6KA", "類別": "2P-20A", "單位": "只", "單價": 226, "主要供應商": "三雨水電材料有限公司"},
@@ -71,42 +71,44 @@ elif db_option == "新增品項":
                 "物品編號": code, "品名": name, "類別": category,
                 "單位": unit, "單價": price, "主要供應商": supplier
             }])
-            st.session_state.database = pd.concat([st.session_state.database, new_row], ignore_index=True)
+            st.session_state.database = pd.concat([st.session_state.database, new_row], ignore_ignore=True)
             st.sidebar.success(f"已新增品項：{name}")
 
 # 主要功能區域：成本估價表單
 st.header("📋 報價估價單製作")
 
-company_name = st.text_input("公司名稱：", value="客戶公司")
+# 公司名稱預設留白
+company_name = st.text_input("公司名稱：", value="")
 
 # 初始化報價單項目
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 
-# 新增報價明細區
-st.subheader("1. 新增報價項目")
-col1, col2 = st.columns([3, 1])
+# 新增報價明細區（改用多選勾選框）
+st.subheader("1. 勾選新增報價項目")
 
-item_list = ["(請選擇品名)"] + list(st.session_state.database["品名"].unique())
-selected_item = col1.selectbox("選擇品名", options=item_list)
-qty = col2.number_input("數量", min_value=1, value=1)
+item_options = list(st.session_state.database["品名"].unique())
+selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options)
 
-if st.button("➕ 加入報價單"):
-    if selected_item != "(請選擇品名)":
-        db_match = st.session_state.database[st.session_state.database["品名"] == selected_item].iloc[0]
-        st.session_state.cart.append({
-            "品名": selected_item,
-            "物品編號": db_match["物品編號"],
-            "品牌/類別": db_match["類別"],
-            "單位": db_match["單位"],
-            "數量": qty,
-            "標準單價 (NT$)": db_match["單價"],
-            "小計金額 (NT$)": qty * db_match["單價"],
-            "備註說明": ""
-        })
-        st.success(f"已加入：{selected_item}")
+if st.button("➕ 將勾選項目加入報價單"):
+    if selected_items:
+        added_names = []
+        for item in selected_items:
+            db_match = st.session_state.database[st.session_state.database["品名"] == item].iloc[0]
+            st.session_state.cart.append({
+                "品名": item,
+                "物品編號": db_match["物品編號"],
+                "品牌/類別": db_match["類別"],
+                "單位": db_match["單位"],
+                "數量": 1,  # 預設數量為 1，可在下方明細直接調整
+                "標準單價 (NT$)": db_match["單價"],
+                "小計金額 (NT$)": db_match["單價"],
+                "備註說明": ""
+            })
+            added_names.append(item)
+        st.success(f"已成功加入 {len(added_names)} 個品項！請至下方明細調整數量。")
     else:
-        st.warning("請先選擇品名！")
+        st.warning("請先勾選至少一個品名！")
 
 # 顯示估價單結果
 st.subheader("2. 估價單明細")
@@ -136,12 +138,13 @@ if len(st.session_state.cart) > 0:
         st.session_state.cart = []
         st.rerun()
         
+    filename_prefix = company_name if company_name else "估價單"
     csv_data = edited_cart.to_csv(index=False).encode('utf-8-sig')
     col_dl2.download_button(
         label="📥 下載報價單 (CSV)",
         data=csv_data,
-        file_name=f"{company_name}_成本報價單.csv",
+        file_name=f"{filename_prefix}_成本報價單.csv",
         mime="text/csv"
     )
 else:
-    st.info("目前報價單為空，請從上方選擇品名並加入。")
+    st.info("目前報價單為空，請從上方勾選品名並點擊加入。")
