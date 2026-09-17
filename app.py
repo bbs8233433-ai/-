@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import os
 
 # 頁面配置與防自動翻譯設定
 st.set_page_config(page_title="成本估價系統", layout="wide")
@@ -8,8 +9,10 @@ st.markdown('<div translate="no">', unsafe_allow_html=True)
 
 st.title("🧮 自動化成本估價系統")
 
-# 初始化完整材料資料庫
-if 'database' not in st.session_state:
+DB_FILE = "database.csv"
+
+# 初始化資料庫：優先讀取 CSV 檔案，若不存在才建立預設檔
+if not os.path.exists(DB_FILE):
     initial_db = [
         {"物品編號": "BHA32C20", "品名": "士林回路保護器2P20A 380V/6KA", "類別": "2P-20A", "單位": "只", "單價": 226, "主要供應商": "三雨水電材料有限公司"},
         {"物品編號": "BHA32C05", "品名": "士林回路保護器2P5A 380V/6KA", "類別": "2P-5A", "單位": "只", "單價": 249, "主要供應商": "三雨水電材料有限公司"},
@@ -46,7 +49,10 @@ if 'database' not in st.session_state:
         {"物品編號": "SJ2S-05BS", "品名": "和泉薄型繼電器座 2P", "類別": "繼電器座", "單位": "只", "單價": 50, "主要供應商": "三雨水電材料有限公司"},
         {"物品編號": "EP", "品名": "變壓器1Φ5A 380V 轉 220V", "類別": "變壓器", "單位": "台", "單價": 1995, "主要供應商": "利能電機"}
     ]
-    st.session_state.database = pd.DataFrame(initial_db)
+    pd.DataFrame(initial_db).to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+
+# 每次重新整理或載入時，直接從實體 CSV 檔讀取最新資料
+df_database = pd.read_csv(DB_FILE)
 
 # 側邊欄：主資料庫管理
 st.sidebar.header("⚙️ 主資料庫維護")
@@ -54,8 +60,13 @@ db_option = st.sidebar.radio("選擇操作", ["查看/編輯資料庫", "新增�
 
 if db_option == "查看/編輯資料庫":
     st.sidebar.subheader("當前品項資料庫")
-    edited_db = st.sidebar.data_editor(st.session_state.database, num_rows="dynamic")
-    st.session_state.database = edited_db
+    edited_db = st.sidebar.data_editor(df_database, num_rows="dynamic")
+    # 如果使用者直接在表格上修改或刪除，同步存回 CSV
+    if not edited_db.equals(df_database):
+        edited_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+        st.sidebar.success("資料庫修改已同步儲存！")
+        st.rerun()
+
 elif db_option == "新增品項":
     st.sidebar.subheader("新增品項至資料庫")
     with st.sidebar.form("add_item_form"):
@@ -72,30 +83,30 @@ elif db_option == "新增品項":
                 "物品編號": code, "品名": name, "類別": category,
                 "單位": unit, "單價": price, "主要供應商": supplier
             }])
-            st.session_state.database = pd.concat([st.session_state.database, new_row], ignore_index=True)
-            st.sidebar.success(f"已新增品項：{name}")
+            updated_db = pd.concat([df_database, new_row], ignore_index=True)
+            # 將新增的品項存入 CSV 檔
+            updated_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+            st.sidebar.success(f"已成功新增並永久儲存：{name}")
+            st.rerun()
 
 # 主要功能區域：成本估價表單
 st.header("📋 報價估價單製作")
 
-# 公司名稱預設留白
 company_name = st.text_input("公司名稱：", value="")
 
-# 初始化報價單項目
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 
-# 新增報價明細區（多選勾選框）
 st.subheader("1. 勾選新增報價項目")
 
-item_options = list(st.session_state.database["品名"].unique())
+item_options = list(df_database["品名"].unique())
 selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options)
 
 if st.button("➕ 將勾選項目加入報價單"):
     if selected_items:
         added_names = []
         for item in selected_items:
-            db_match = st.session_state.database[st.session_state.database["品名"] == item].iloc[0]
+            db_match = df_database[df_database["品名"] == item].iloc[0]
             st.session_state.cart.append({
                 "品名": item,
                 "物品編號": db_match["物品編號"],
@@ -111,7 +122,6 @@ if st.button("➕ 將勾選項目加入報價單"):
     else:
         st.warning("請先勾選至少一個品名！")
 
-# 顯示估價單結果
 st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
     cart_df = pd.DataFrame(st.session_state.cart)
@@ -139,12 +149,10 @@ if len(st.session_state.cart) > 0:
         st.session_state.cart = []
         st.rerun()
         
-    # 自動取得今天日期 YYYYMMDD 格式
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    export_filename = f"{today_str}-{name_suffix}_成本.csv"
+    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
 
-    # 在導出的 CSV 資料最下方加入「總計金額」行
     export_df = edited_cart.copy()
     total_row = pd.DataFrame([{
         "品名": "總計",
