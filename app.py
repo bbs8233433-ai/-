@@ -72,7 +72,6 @@ elif db_option == "新增品項":
         name = st.text_input("品名")
         category = st.text_input("品牌/類別")
         unit = st.text_input("單位", value="只")
-        # 設定 value=None 讓預設欄位顯示為空白 placeholder
         price = st.number_input("標準單價 (NT$)", min_value=0, value=None, placeholder="請輸入單價")
         supplier = st.text_input("主要供應商")
         submit = st.form_submit_button("新增品項")
@@ -150,7 +149,8 @@ if len(st.session_state.cart) > 0:
         
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
+    # 修改檔名移除「報價單」三個字，只保留「_成本」
+    export_filename = f"{today_str}-{name_suffix}_成本.csv"
 
     export_df = edited_cart.copy()
     total_row = pd.DataFrame([{
