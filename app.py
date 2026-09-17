@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 # 頁面配置與防自動翻譯設定
 st.set_page_config(page_title="成本估價系統", layout="wide")
@@ -71,7 +72,7 @@ elif db_option == "新增品項":
                 "物品編號": code, "品名": name, "類別": category,
                 "單位": unit, "單價": price, "主要供應商": supplier
             }])
-            st.session_state.database = pd.concat([st.session_state.database, new_row], ignore_ignore=True)
+            st.session_state.database = pd.concat([st.session_state.database, new_row], ignore_index=True)
             st.sidebar.success(f"已新增品項：{name}")
 
 # 主要功能區域：成本估價表單
@@ -84,7 +85,7 @@ company_name = st.text_input("公司名稱：", value="")
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 
-# 新增報價明細區（改用多選勾選框）
+# 新增報價明細區（多選勾選框）
 st.subheader("1. 勾選新增報價項目")
 
 item_options = list(st.session_state.database["品名"].unique())
@@ -100,7 +101,7 @@ if st.button("➕ 將勾選項目加入報價單"):
                 "物品編號": db_match["物品編號"],
                 "品牌/類別": db_match["類別"],
                 "單位": db_match["單位"],
-                "數量": 1,  # 預設數量為 1，可在下方明細直接調整
+                "數量": 1,  # 預設數量為 1
                 "標準單價 (NT$)": db_match["單價"],
                 "小計金額 (NT$)": db_match["單價"],
                 "備註說明": ""
@@ -138,12 +139,16 @@ if len(st.session_state.cart) > 0:
         st.session_state.cart = []
         st.rerun()
         
-    filename_prefix = company_name if company_name else "估價單"
+    # 自動取得今天日期 YYYYMMDD 格式
+    today_str = datetime.now().strftime("%Y%m%d")
+    name_suffix = company_name if company_name else "估價單"
+    export_filename = f"{today_str}-{name_suffix}_成本報價單.csv"
+
     csv_data = edited_cart.to_csv(index=False).encode('utf-8-sig')
     col_dl2.download_button(
         label="📥 下載報價單 (CSV)",
         data=csv_data,
-        file_name=f"{filename_prefix}_成本報價單.csv",
+        file_name=export_filename,
         mime="text/csv"
     )
 else:
