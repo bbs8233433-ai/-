@@ -128,7 +128,7 @@ st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
     cart_df = pd.DataFrame(st.session_state.cart)
     
-    # 使用表格編輯器，限定只能修改「數量」與「備註說明」
+    # 明細編輯器：明確開放「數量」與「備註說明」為可編輯狀態，其餘欄位禁止修改
     edited_cart = st.data_editor(
         cart_df,
         column_config={
@@ -140,12 +140,12 @@ if len(st.session_state.cart) > 0:
         key="cart_editor"
     )
     
-    # 動態計算最新小計與總金額
+    # 重新即時連動計算「小計金額」
     edited_cart["數量"] = pd.to_numeric(edited_cart["數量"], errors='coerce').fillna(1).astype(int)
     edited_cart["標準單價 (NT$)"] = pd.to_numeric(edited_cart["標準單價 (NT$)"], errors='coerce').fillna(0).astype(int)
     edited_cart["小計金額 (NT$)"] = edited_cart["數量"] * edited_cart["標準單價 (NT$)"]
     
-    # 如果使用者修改了數量或內容，同步更新 session_state
+    # 將更新後的數量與小計同步儲存至 session_state
     st.session_state.cart = edited_cart.to_dict('records')
     
     total_amount = edited_cart["小計金額 (NT$)"].sum()
