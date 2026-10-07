@@ -59,7 +59,7 @@ db_option = st.sidebar.radio("選擇操作", ["查看/編輯資料庫", "新增�
 
 if db_option == "查看/編輯資料庫":
     st.sidebar.subheader("當前品項資料庫")
-    edited_db = st.sidebar.data_editor(df_database, num_rows="dynamic")
+    edited_db = st.sidebar.data_editor(df_database, num_rows="dynamic", key="db_editor")
     if not edited_db.equals(df_database):
         edited_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
         st.sidebar.success("資料庫修改已同步儲存！")
@@ -98,7 +98,10 @@ if 'cart' not in st.session_state:
 st.subheader("1. 勾選新增報價項目")
 
 item_options = list(df_database["品名"].unique())
-selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options)
+col_select, col_qty = st.columns([3, 1])
+
+selected_items = col_select.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options)
+default_qty = col_qty.number_input("預設加入數量", min_value=1, value=1)
 
 if st.button("➕ 將勾選項目加入報價單"):
     if selected_items:
@@ -110,13 +113,14 @@ if st.button("➕ 將勾選項目加入報價單"):
                 "物品編號": db_match["物品編號"],
                 "品牌/類別": db_match["類別"],
                 "單位": db_match["單位"],
-                "數量": 1,
-                "標準單價 (NT$)": db_match["單價"],
-                "小計金額 (NT$)": db_match["單價"],
+                "數量": int(default_qty),
+                "標準單價 (NT$)": int(db_match["單價"]),
+                "小計金額 (NT$)": int(default_qty * db_match["單價"]),
                 "備註說明": ""
             })
             added_names.append(item)
-        st.success(f"已成功加入 {len(added_names)} 個品項！請至下方明細調整數量。")
+        st.success(f"已成功加入 {len(added_names)} 個品項！")
+        st.rerun()
     else:
         st.warning("請先勾選至少一個品名！")
 
@@ -124,17 +128,26 @@ st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
     cart_df = pd.DataFrame(st.session_state.cart)
     
+    # 使用表格編輯器，限定只能修改「數量」與「備註說明」
     edited_cart = st.data_editor(
         cart_df,
         column_config={
-            "數量": st.column_config.NumberColumn(min_value=1),
-            "小計金額 (NT$)": st.column_config.NumberColumn(disabled=True),
+            "數量": st.column_config.NumberColumn("數量", min_value=1, step=1, required=True),
+            "小計金額 (NT$)": st.column_config.NumberColumn("小計金額 (NT$)", disabled=True),
         },
         disabled=["品名", "物品編號", "品牌/類別", "單位", "標準單價 (NT$)"],
-        num_rows="dynamic"
+        num_rows="dynamic",
+        key="cart_editor"
     )
     
+    # 動態計算最新小計與總金額
+    edited_cart["數量"] = pd.to_numeric(edited_cart["數量"], errors='coerce').fillna(1).astype(int)
+    edited_cart["標準單價 (NT$)"] = pd.to_numeric(edited_cart["標準單價 (NT$)"], errors='coerce').fillna(0).astype(int)
     edited_cart["小計金額 (NT$)"] = edited_cart["數量"] * edited_cart["標準單價 (NT$)"]
+    
+    # 如果使用者修改了數量或內容，同步更新 session_state
+    st.session_state.cart = edited_cart.to_dict('records')
+    
     total_amount = edited_cart["小計金額 (NT$)"].sum()
     item_count = len(edited_cart)
 
@@ -149,7 +162,6 @@ if len(st.session_state.cart) > 0:
         
     today_str = datetime.now().strftime("%Y%m%d")
     name_suffix = company_name if company_name else "估價單"
-    # 修改檔名移除「報價單」三個字，只保留「_成本」
     export_filename = f"{today_str}-{name_suffix}_成本.csv"
 
     export_df = edited_cart.copy()
