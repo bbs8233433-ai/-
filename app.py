@@ -98,11 +98,10 @@ if 'cart' not in st.session_state:
 
 st.subheader("1. 勾選新增報價項目")
 
-# 先將資料庫依照「物品編號」排序，再提取品名選項，讓下拉選單也自動依編號排列
-df_database_sorted = df_database.sort_values(by="物品編號", ascending=True)
+# 下拉選單品名改以「品名」筆劃/字母排序
+df_database_sorted = df_database.sort_values(by="品名", ascending=True)
 item_options = list(df_database_sorted["品名"].unique())
 
-# 多選下拉選單
 selected_items = st.multiselect(
     "請勾選或搜尋要新增的品名（可多選）：", 
     options=item_options, 
@@ -130,15 +129,13 @@ def add_to_cart_callback():
                 })
                 added_count += 1
         
-        # 加入後自動依「物品編號」排序
+        # 關鍵修改：將購物車明細改為依照「品名」排序，讓同名稱品項排在一起
         if len(st.session_state.cart) > 0:
             cart_tmp = pd.DataFrame(st.session_state.cart)
-            cart_tmp = cart_tmp.sort_values(by="物品編號", ascending=True)
+            cart_tmp = cart_tmp.sort_values(by="品名", ascending=True)
             st.session_state.cart = cart_tmp.to_dict('records')
         
         st.success(f"成功加入 {added_count} 個新品項並完成排序！")
-        
-        # 透過 callback 清空選單
         st.session_state.selected_items_key = []
     else:
         st.warning("請先勾選至少一個品名！")
@@ -148,7 +145,8 @@ st.button("➕ 將勾選項目加入報價單", on_click=add_to_cart_callback)
 st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
     cart_df = pd.DataFrame(st.session_state.cart)
-    cart_df = cart_df.sort_values(by="物品編號", ascending=True)
+    # 明細表格強制依「品名」排序
+    cart_df = cart_df.sort_values(by="品名", ascending=True)
     
     edited_cart = st.data_editor(
         cart_df,
@@ -165,7 +163,8 @@ if len(st.session_state.cart) > 0:
     edited_cart["標準單價 (NT$)"] = pd.to_numeric(edited_cart["標準單價 (NT$)"], errors='coerce').fillna(0).astype(int)
     edited_cart["小計金額 (NT$)"] = edited_cart["數量"] * edited_cart["標準單價 (NT$)"]
     
-    edited_cart = edited_cart.sort_values(by="物品編號", ascending=True)
+    # 編輯數量後也保持依「品名」排序
+    edited_cart = edited_cart.sort_values(by="品名", ascending=True)
     
     updated_cart_list = edited_cart.to_dict('records')
     if updated_cart_list != st.session_state.cart:
