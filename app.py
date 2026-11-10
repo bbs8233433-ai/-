@@ -96,21 +96,12 @@ company_name = st.text_input("公司名稱：", value="")
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 
-# 初始化清空狀態控制變數
-if 'clear_multiselect' not in st.session_state:
-    st.session_state.clear_multiselect = False
-
 st.subheader("1. 勾選新增報價項目")
 
 item_options = list(df_database["品名"].unique())
 
-# 如果剛點擊加入，預設值帶入空陣列來達成清空效果
-default_selection = [] if st.session_state.clear_multiselect else None
-selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options, default=default_selection, key="item_selector")
-
-# 每次渲染後將清空旗標重設
-if st.session_state.clear_multiselect:
-    st.session_state.clear_multiselect = False
+# 直接建立多選下拉選單（透過 key 控制狀態）
+selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options, key="item_selector")
 
 if st.button("➕ 將勾選項目加入報價單"):
     if selected_items:
@@ -139,8 +130,10 @@ if st.button("➕ 將勾選項目加入報價單"):
         
         st.success(f"成功加入 {added_count} 個新品項並完成排序！")
         
-        # 設定清空旗標並重新整理
-        st.session_state.clear_multiselect = True
+        # 關鍵：直接從 session_state 中刪除該選單的暫存記憶，強制下次渲染時為空
+        if "item_selector" in st.session_state:
+            del st.session_state["item_selector"]
+            
         st.rerun()
     else:
         st.warning("請先勾選至少一個品名！")
