@@ -98,7 +98,9 @@ if 'cart' not in st.session_state:
 
 st.subheader("1. 勾選新增報價項目")
 
-item_options = list(df_database["品名"].unique())
+# 先將資料庫依照「物品編號」排序，再提取品名選項，讓下拉選單也自動依編號排列
+df_database_sorted = df_database.sort_values(by="物品編號", ascending=True)
+item_options = list(df_database_sorted["品名"].unique())
 
 # 多選下拉選單
 selected_items = st.multiselect(
@@ -107,7 +109,7 @@ selected_items = st.multiselect(
     key="selected_items_key"
 )
 
-# 定義點擊按鈕時執行的回呼函數（安全更新 session_state）
+# 定義點擊按鈕時執行的回呼函數
 def add_to_cart_callback():
     current_selection = st.session_state.get("selected_items_key", [])
     if current_selection:
@@ -141,7 +143,6 @@ def add_to_cart_callback():
     else:
         st.warning("請先勾選至少一個品名！")
 
-# 透過 on_click 觸發 callback，完美避免衝突
 st.button("➕ 將勾選項目加入報價單", on_click=add_to_cart_callback)
 
 st.subheader("2. 估價單明細")
