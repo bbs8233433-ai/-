@@ -100,43 +100,39 @@ st.subheader("1. 勾選新增報價項目")
 
 item_options = list(df_database["品名"].unique())
 
-# 直接建立多選下拉選單（透過 key 控制狀態）
-selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options, key="item_selector")
+# 使用 st.form 包裹多選與按鈕，送出後會原生自動清空選單
+with st.form("add_items_form"):
+    selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options)
+    submit_added = st.form_submit_button("➕ 將勾選項目加入報價單")
 
-if st.button("➕ 將勾選項目加入報價單"):
-    if selected_items:
-        added_count = 0
-        for item in selected_items:
-            db_match = df_database[df_database["品名"] == item].iloc[0]
-            existing_names = [cart_item["品名"] for cart_item in st.session_state.cart]
-            if item not in existing_names:
-                st.session_state.cart.append({
-                    "品名": item,
-                    "物品編號": db_match["物品編號"],
-                    "品牌/類別": db_match["類別"],
-                    "單位": db_match["單位"],
-                    "數量": 1,
-                    "標準單價 (NT$)": int(db_match["單價"]),
-                    "小計金額 (NT$)": int(db_match["單價"]),
-                    "備註說明": ""
-                })
-                added_count += 1
-        
-        # 加入後自動依「物品編號」排序
-        if len(st.session_state.cart) > 0:
-            cart_tmp = pd.DataFrame(st.session_state.cart)
-            cart_tmp = cart_tmp.sort_values(by="物品編號", ascending=True)
-            st.session_state.cart = cart_tmp.to_dict('records')
-        
-        st.success(f"成功加入 {added_count} 個新品項並完成排序！")
-        
-        # 關鍵：直接從 session_state 中刪除該選單的暫存記憶，強制下次渲染時為空
-        if "item_selector" in st.session_state:
-            del st.session_state["item_selector"]
+    if submit_added:
+        if selected_items:
+            added_count = 0
+            for item in selected_items:
+                db_match = df_database[df_database["品名"] == item].iloc[0]
+                existing_names = [cart_item["品名"] for cart_item in st.session_state.cart]
+                if item not in existing_names:
+                    st.session_state.cart.append({
+                        "品名": item,
+                        "物品編號": db_match["物品編號"],
+                        "品牌/類別": db_match["類別"],
+                        "單位": db_match["單位"],
+                        "數量": 1,
+                        "標準單價 (NT$)": int(db_match["單價"]),
+                        "小計金額 (NT$)": int(db_match["單價"]),
+                        "備註說明": ""
+                    })
+                    added_count += 1
             
-        st.rerun()
-    else:
-        st.warning("請先勾選至少一個品名！")
+            # 加入後自動依「物品編號」排序
+            if len(st.session_state.cart) > 0:
+                cart_tmp = pd.DataFrame(st.session_state.cart)
+                cart_tmp = cart_tmp.sort_values(by="物品編號", ascending=True)
+                st.session_state.cart = cart_tmp.to_dict('records')
+            
+            st.success(f"成功加入 {added_count} 個新品項並完成排序！")
+        else:
+            st.warning("請先勾選至少一個品名！")
 
 st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
