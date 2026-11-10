@@ -40,4 +40,68 @@ if not os.path.exists(DB_FILE):
         {"物品編號": "JJA1-604517-1.2T", "品名": "鐵明箱600*450*170 厚1.2mm 鐵底", "類別": "烤漆箱", "單位": "只", "單價": 1600, "主要供應商": "三雨水電材料有限公司"},
         {"物品編號": "JJA1-705016-1.2T", "品名": "鐵明箱700*500*160 厚1.2mm 鐵底", "類別": "烤漆箱", "單位": "只", "單價": 3100, "主要供應商": "三雨水電材料有限公司"},
         {"物品編號": "QCE-3P50A", "品名": "東元無熔絲3P50A", "類別": "無熔絲開關", "單位": "只", "單價": 334, "主要供應商": "三雨水電材料有限公司"},
-        {"物品編號": "MW-HDR-30-24 1.5A", "品名": "明緯軌道式電源供應器 30w 24V", "類別": "電源供應器 30w", "單位": "只", "單價": 350, "主要供應
+        {"物品編號": "MW-HDR-30-24 1.5A", "品名": "明緯軌道式電源供應器 30w 24V", "類別": "電源供應器 30w", "單位": "只", "單價": 350, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "LED-S9-220-Y", "品名": "卡式燈泡LED AC/220V", "類別": "燈泡 220V", "單位": "只", "單價": 35, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "TN2SS4B-1AA", "品名": "天德選擇三段 1A-0-1A黑", "類別": "選擇開關", "單位": "只", "單價": 96, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "YW1S-2E10", "品名": "和泉選擇開關二段 1A", "類別": "選擇開關", "單位": "只", "單價": 57, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "RJ2S-CL A220", "品名": "和泉薄型繼電器 2P AC220V", "類別": "繼電器 220V", "單位": "只", "單價": 90, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "RJ2S-CL D24", "品名": "和泉薄型繼電器 2P DC24V", "類別": "繼電器 24V", "單位": "只", "單價": 90, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "SJ2S-05BS", "品名": "和泉薄型繼電器座 2P", "類別": "繼電器座", "單位": "只", "單價": 50, "主要供應商": "三雨水電材料有限公司"},
+        {"物品編號": "EP", "品名": "變壓器1Φ5A 380V 轉 220V", "類別": "變壓器", "單位": "台", "單價": 1995, "主要供應商": "利能電機"}
+    ]
+    pd.DataFrame(initial_db).to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+
+df_database = pd.read_csv(DB_FILE)
+
+# 側邊欄：主資料庫管理
+st.sidebar.header("⚙️ 主資料庫維護")
+db_option = st.sidebar.radio("選擇操作", ["查看/編輯資料庫", "新增品項"])
+
+if db_option == "查看/編輯資料庫":
+    st.sidebar.subheader("當前品項資料庫")
+    edited_db = st.sidebar.data_editor(df_database, num_rows="dynamic", key="db_editor")
+    if not edited_db.equals(df_database):
+        edited_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+        st.sidebar.success("資料庫修改已同步儲存！")
+        st.rerun()
+
+elif db_option == "新增品項":
+    st.sidebar.subheader("新增品項至資料庫")
+    with st.sidebar.form("add_item_form"):
+        code = st.text_input("物品編號")
+        name = st.text_input("品名")
+        category = st.text_input("品牌/類別")
+        unit = st.text_input("單位", value="只")
+        price = st.number_input("標準單價 (NT$)", min_value=0, value=None, placeholder="請輸入單價")
+        supplier = st.text_input("主要供應商")
+        submit = st.form_submit_button("新增品項")
+        
+        if submit and name:
+            actual_price = price if price is not None else 0
+            new_row = pd.DataFrame([{
+                "物品編號": code, "品名": name, "類別": category,
+                "單位": unit, "單價": actual_price, "主要供應商": supplier
+            }])
+            updated_db = pd.concat([df_database, new_row], ignore_index=True)
+            updated_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+            st.sidebar.success(f"已成功新增並永久儲存：{name}")
+            st.rerun()
+
+# 主要功能區域：成本估價表單
+st.header("📋 報價估價單製作")
+
+company_name = st.text_input("公司名稱：", value="")
+
+if 'cart' not in st.session_state:
+    st.session_state.cart = []
+
+st.subheader("1. 勾選新增報價項目")
+
+item_options = list(df_database["品名"].unique())
+selected_items = st.multiselect("請勾選或搜尋要新增的品名（可多選）：", options=item_options)
+
+if st.button("➕ 將勾選項目加入報價單"):
+    if selected_items:
+        added_names = []
+        for item in selected_items:
+            db_match = df_database[df_database["品名"] == item].iloc[0]
