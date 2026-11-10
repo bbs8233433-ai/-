@@ -96,25 +96,23 @@ company_name = st.text_input("公司名稱：", value="")
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 
-# 初始化 multiselect 的 session_state 鍵值
-if 'selected_items_key' not in st.session_state:
-    st.session_state.selected_items_key = []
-
 st.subheader("1. 勾選新增報價項目")
 
 item_options = list(df_database["品名"].unique())
 
-# 讓 multiselect 直接綁定 session_state
+# 多選下拉選單
 selected_items = st.multiselect(
     "請勾選或搜尋要新增的品名（可多選）：", 
     options=item_options, 
     key="selected_items_key"
 )
 
-if st.button("➕ 將勾選項目加入報價單"):
-    if selected_items:
+# 定義點擊按鈕時執行的回呼函數（安全更新 session_state）
+def add_to_cart_callback():
+    current_selection = st.session_state.get("selected_items_key", [])
+    if current_selection:
         added_count = 0
-        for item in selected_items:
+        for item in current_selection:
             db_match = df_database[df_database["品名"] == item].iloc[0]
             existing_names = [cart_item["品名"] for cart_item in st.session_state.cart]
             if item not in existing_names:
@@ -136,12 +134,15 @@ if st.button("➕ 將勾選項目加入報價單"):
             cart_tmp = cart_tmp.sort_values(by="物品編號", ascending=True)
             st.session_state.cart = cart_tmp.to_dict('records')
         
-        # 關鍵：直接將 session_state 中的選取清單設為空，強制畫面清空
-        st.session_state.selected_items_key = []
         st.success(f"成功加入 {added_count} 個新品項並完成排序！")
-        st.rerun()
+        
+        # 透過 callback 清空選單
+        st.session_state.selected_items_key = []
     else:
         st.warning("請先勾選至少一個品名！")
+
+# 透過 on_click 觸發 callback，完美避免衝突
+st.button("➕ 將勾選項目加入報價單", on_click=add_to_cart_callback)
 
 st.subheader("2. 估價單明細")
 if len(st.session_state.cart) > 0:
