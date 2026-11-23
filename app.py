@@ -81,8 +81,12 @@ elif db_option == "新增品項":
         if submit and name:
             actual_price = price if price is not None else 0
             new_row = pd.DataFrame([{
-                "物品編號": code, "品名": name, "類別": category,
-                "單位": unit, "單價": actual_price, "主要供應商": supplier
+                "物品編號": code,
+                "品名": name,
+                "類別": category,
+                "單位": unit,
+                "單價": actual_price,
+                "主要供應商": supplier
             }])
             updated_db = pd.concat([df_database, new_row], ignore_index=True)
             updated_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
@@ -94,7 +98,7 @@ st.header("📋 報價估價單製作")
 
 company_name = st.text_input("公司名稱：", value="")
 
-if 'cart' not in st.session_state:
+if "cart" not in st.session_state:
     st.session_state.cart = []
 
 st.subheader("1. 勾選新增報價項目")
@@ -109,6 +113,7 @@ selected_items = st.multiselect(
     key="selected_items_key"
 )
 
+
 def add_to_cart_callback():
     current_selection = st.session_state.get("selected_items_key", [])
     if current_selection:
@@ -118,7 +123,3 @@ def add_to_cart_callback():
             existing_names = [cart_item["品名"] for cart_item in st.session_state.cart]
             if item not in existing_names:
                 st.session_state.cart.append({
-                    "品名": item,
-                    "物品編號": db_match["物品編號"],
-                    "品牌/類別": db_match["類別"],
-                    "單位": db_
