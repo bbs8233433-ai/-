@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="成本估價系統", layout="wide")
 st.markdown('<div translate="no">', unsafe_allow_html=True)
-st.title("🧮 自動化成本估價系統")
+st.title("自動化成本估價系統")
 
 DB_FILE = "database.csv"
 COLUMNS = ["物品編號", "品名", "類別", "單位", "單價", "主要供應商"]
@@ -54,4 +54,161 @@ if not os.path.exists(DB_FILE):
 df_database = pd.read_csv(DB_FILE)
 
 # 側邊欄：主資料庫管理
-st.sidebar.header("⚙️
+st.sidebar.header("主資料庫維護")
+db_option = st.sidebar.radio("選擇操作", ["查看/編輯資料庫", "新增品項"])
+
+if db_option == "查看/編輯資料庫":
+    st.sidebar.subheader("當前品項資料庫")
+    edited_db = st.sidebar.data_editor(df_database, num_rows="dynamic", key="db_editor")
+    if not edited_db.equals(df_database):
+        edited_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+        st.sidebar.success("資料庫修改已同步儲存！")
+        st.rerun()
+
+elif db_option == "新增品項":
+    st.sidebar.subheader("新增品項至資料庫")
+    with st.sidebar.form("add_item_form"):
+        code = st.text_input("物品編號")
+        name = st.text_input("品名")
+        category = st.text_input("品牌/類別")
+        unit = st.text_input("單位", value="只")
+        price = st.number_input("標準單價 (NT$)", min_value=0, value=None, placeholder="請輸入單價")
+        supplier = st.text_input("主要供應商")
+        submit = st.form_submit_button("新增品項")
+
+        if submit and name:
+            actual_price = price if price is not None else 0
+            new_row = pd.DataFrame([{
+                "物品編號": code,
+                "品名": name,
+                "類別": category,
+                "單位": unit,
+                "單價": actual_price,
+                "主要供應商": supplier,
+            }])
+            updated_db = pd.concat([df_database, new_row], ignore_index=True)
+            updated_db.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
+            st.sidebar.success(f"已成功新增並永久儲存：{name}")
+            st.rerun()
+
+# 主畫面：報價估價單製作
+st.header("報價估價單製作")
+company_name = st.text_input("公司名稱：", value="")
+
+if "cart" not in st.session_state:
+    st.session_state.cart = []
+
+st.subheader("1. 勾選新增報價項目")
+item_options = list(df_database.sort_values(by="品名", ascending=True)["品名"].unique())
+
+st.multiselect(
+    "請勾選或搜尋要新增的品名（可多選）：",
+    options=item_options,
+    key="selected_items_key",
+)
+
+
+def add_to_cart_callback():
+    current_selection = st.session_state.get("selected_items_key", [])
+    if not current_selection:
+        st.warning("請先勾選至少一個品名！")
+        return
+
+    existing_names = {cart_item["品名"] for cart_item in st.session_state.cart}
+    added_count = 0
+
+    for item in current_selection:
+        if item in existing_names:
+            continue
+        db_match = df_database[df_database["品名"] == item].iloc[0]
+        unit_price = int(db_match["單價"])
+        new_item = {
+            "品名": item,
+            "物品編號": db_match["物品編號"],
+            "品牌/類別": db_match["類別"],
+            "單位": db_match["單位"],
+            "數量": 1,
+            "標準單價 (NT$)": unit_price,
+            "小計金額 (NT$)": unit_price,
+            "備註說明": "",
+        }
+        st.session_state.cart.append(new_item)
+        existing_names.add(item)
+        added_count += 1
+
+    if st.session_state.cart:
+        cart_tmp = pd.DataFrame(st.session_state.cart).sort_values(by="品名", ascending=True)
+        st.session_state.cart = cart_tmp.to_dict("records")
+
+    st.session_state.selected_items_key = []
+    st.success(f"成功加入 {added_count} 個新品項並完成排序！")
+
+
+st.button("+ 將勾選項目加入報價單", on_click=add_to_cart_callback)
+
+st.subheader("2. 估價單明細")
+if st.session_state.cart:
+    cart_df = pd.DataFrame(st.session_state.cart).sort_values(by="品名", ascending=True)
+
+    edited_cart = st.data_editor(
+        cart_df,
+        column_config={
+            "數量": st.column_config.NumberColumn("數量", min_value=1, step=1, required=True),
+            "小計金額 (NT$)": st.column_config.NumberColumn("小計金額 (NT$)", disabled=True),
+        },
+        disabled=["品名", "物品編號", "品牌/類別", "單位", "標準單價 (NT$)"],
+        num_rows="dynamic",
+        key="cart_editor",
+    )
+
+    edited_cart["數量"] = pd.to_numeric(edited_cart["數量"], errors="coerce").fillna(1).astype(int)
+    edited_cart["標準單價 (NT$)"] = pd.to_numeric(edited_cart["標準單價 (NT$)"], errors="coerce").fillna(0).astype(int)
+    edited_cart["小計金額 (NT$)"] = edited_cart["數量"] * edited_cart["標準單價 (NT$)"]
+    edited_cart = edited_cart.sort_values(by="品名", ascending=True)
+
+    updated_cart_list = edited_cart.to_dict("records")
+    if updated_cart_list != st.session_state.cart:
+        st.session_state.cart = updated_cart_list
+        st.rerun()
+
+    total_amount = edited_cart["小計金額 (NT$)"].sum()
+    item_count = len(edited_cart)
+
+    col_a, col_b = st.columns(2)
+    col_a.metric("填報品項筆數", f"{item_count} 筆")
+    col_b.metric("報價總金額 (NT$)", f"${total_amount:,.0f}")
+
+    col_dl1, col_dl2 = st.columns(2)
+    if col_dl1.button("清空報價單"):
+        st.session_state.cart = []
+        st.session_state.selected_items_key = []
+        st.rerun()
+
+    today_str = datetime.now().strftime("%Y%m%d")
+    name_suffix = company_name if company_name else "估價單"
+    export_filename = f"{today_str}-{name_suffix}_成本.xlsx"
+
+    total_row = pd.DataFrame([{
+        "品名": "總計",
+        "物品編號": "",
+        "品牌/類別": "",
+        "單位": "",
+        "數量": "",
+        "標準單價 (NT$)": "",
+        "小計金額 (NT$)": total_amount,
+        "備註說明": "",
+    }])
+    export_df = pd.concat([edited_cart, total_row], ignore_index=True)
+
+    excel_buffer = BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+        export_df.to_excel(writer, index=False, sheet_name="成本估價明細")
+
+    col_dl2.download_button(
+        label="下載報價單 (Excel)",
+        data=excel_buffer.getvalue(),
+        file_name=export_filename,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+else:
+    st.info("目前報價單為空，請從上方勾選品名並點擊加入。")
